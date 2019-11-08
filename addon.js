@@ -1,87 +1,142 @@
-const { addonBuilder } = require("stremio-addon-sdk");
-var request = require('request');
+const { addonBuilder } = require('stremio-addon-sdk')
+const request = require('request')
+const utils = require('./utils')
+const package = require('./package.json')
 
-/*
-        const meta = {
-            id: 'tt1254207',
-            name: 'Big Buck Bunny',
-            year: 2008,
-            poster: 'https://image.tmdb.org/t/p/w600_and_h900_bestv2/uVEFQvFMMsg4e6yb03xOfVsDz4o.jpg',
-            posterShape: 'regular',
-            banner: 'https://image.tmdb.org/t/p/original/aHLST0g8sOE1ixCxRDgM35SKwwp.jpg',
-            type: 'movie'
-		}
-	*/
-// Docs: https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/api/responses/manifest.md
+const endpoint = 'https://yts.ae' // works with yts.lt too
+
+const oneDay = 24 * 60 * 60 // in seconds
+
+const cache = {
+	maxAge: 1.5 * oneDay, // 1.5 days
+	staleError: 6 * 30 * oneDay // 6 months
+}
+
 const manifest = {
-	"id": "community.yts",
-	"version": "0.0.1",
-	"catalogs": [{'type':'movie','id':'yts','name':'YTS',"extra": [
+	id: 'community.yts',
+	logo: 'https://i2.wp.com/fosslovers.com/wp-content/uploads/2019/01/YTS-logo.png',
+	version: package.version,
+	catalogs: [
 		{
-		  "name": "genre",
-		  "options": ['Action','Adventure','Animation','Biography','Comedy','Crime','Documentary','Drama','Family','Fantasy','Film Noir','History','Horror','Music','Musical','Mystery','Romance','Sci-Fi','Short Film','Sport','Superhero','Thriller','War','Western'],
-		  "isRequired": false
-		}
-	  ]}],
-	"resources": ["catalog"],
-	"types": ['Movie'],
-	"name": "YTS",
-	"description": "YTS",
-	"idPrefixes": [
-		"tt"
-	]
-}
-const builder = new addonBuilder(manifest)
-function getMovies(page,cat=false){
-	return new Promise((resolve, reject) => {
-		request('https://yts.ae/api/v2/list_movies.json?'+(cat?'genre='+cat+'&':'')+'limit=50&page='+page, function (error, response, data) {	
-			if (!error && response.statusCode == 200) {
-				var jsonObject = JSON.parse(data)['data']['movies'];
-				var metas = [];
-				for (let i = 0; i < jsonObject.length; i++) {
-					const item = jsonObject[i];
-					metas.push({
-						id:item.imdb_code,
-						name:item.title,
-						poster:'https://yts.ae'+item.large_cover_image,
-						background:'https://yts.ae'+item.background_image_original,
-						posterShape: 'regular',
-						year:item.year,
-						releaseInfo:item.year,
-						released:item.date_uploaded,
-						language:item.language,
-						imdbRating:item.rating,
-						runtime:item.runtime+'m',
-						genres:item.genres,
-						type:'movie'
-					})
+			type: 'movie',
+			id: 'yts',
+			name: 'YTS',
+			extra: [
+				{
+		  			name: 'genre',
+		  			options: ['Action','Adventure','Animation','Biography','Comedy','Crime','Documentary','Drama','Family','Fantasy','Film Noir','History','Horror','Music','Musical','Mystery','Romance','Sci-Fi','Short Film','Sport','Superhero','Thriller','War','Western'],
+		  			isRequired: false
 				}
-				resolve(metas);
-			}else{
-				reject();
-			}
-		});
-	});
+	  		]
+	  	}
+	],
+	resources: ['catalog', 'stream'],
+	types: ['movie'],
+	name: 'YTS',
+	description: 'Movies and torrent results from YTS',
+	idPrefixes: ['tt']
 }
 
-
-// 
-https://api.themoviedb.org
-builder.defineCatalogHandler(function(args, cb) {
-	// filter the dataset object and only take the requested type
-	start = 1;
-	cat = false;
-	if(args.extra && args.extra.skip){
-		start = Math.round(args.extra.skip/50)+1
-	}
-	if(args.extra && args.extra.genre){
-		cat = args.extra.genre;
-	}
+function getMovies(page, cat = false) {
 	return new Promise((resolve, reject) => {
-		Promise.all([getMovies(start,cat)]).then(function(values) {
-			resolve({'metas':[].concat.apply([], values)});
-		});
-	});
-});
+
+		const query = {
+			genre: cat,
+			limit: 50,
+			sort_by: 'seeds',
+			page
+		}
+
+		request(endpoint + '/api/v2/list_movies.json?' + utils.serialize(query), (error, response, data) => {	
+
+			if (error || !data || response.statusCode != 200) {
+				reject('Invalid response from API for category: ' + (cat || 'top') + ' / page: ' + page)
+				return
+			}
+
+			const jsonObject = JSON.parse(data)['data']['movies']
+
+			const metas = (jsonObject || []).map(item => {
+				return {
+					id: item.imdb_code,
+					name: item.title,
+					poster: endpoint + item.large_cover_image,
+					background: endpoint + item.background_image_original,
+					year: item.year,
+					releaseInfo: item.year,
+					language: item.language,
+					imdbRating: item.rating,
+					runtime: item.runtime + 'm',
+					genres: item.genres,
+					type: 'movie'
+				}
+			})
+
+			resolve({
+				metas,
+				cacheMaxAge: cache.maxAge,
+				staleError: cache.staleError
+			})
+		})
+	})
+}
+
+function getStreams(imdb) {
+	return new Promise((resolve, reject) => {
+
+		const query = { query_term: imdb }
+
+		request(endpoint + '/api/v2/list_movies.json/?' + utils.serialize(query), (error, response, data) => {	
+
+			if (error || !data || response.statusCode != 200) {
+				reject('Invalid responde from API for: ' + imdb)
+				return
+			}
+
+			const jsonObject = JSON.parse(data)['data']['movies']
+
+			const item = (jsonObject || []).find(el => {
+				return el.imdb_code == imdb
+			})
+
+			let streams = []
+
+			if (((item || {}).torrents || []).length)
+				streams = item.torrents.map(el => {
+					const hash = el.hash.toLowerCase()
+					return {
+						title: utils.capitalize(el.type) + ' / ' + el.quality + ', S: ' + el.seeds + ' L: ' + el.peers + ', Size: ' + el.size,
+						infoHash: hash,
+						sources: [
+							'dht:' + hash,
+							'tracker:udp://tracker.coppersurfer.tk:6969/announce',
+							'tracker:udp://9.rarbg.com:2710/announce',
+							'tracker:udp://p4p.arenabg.com:1337',
+							'tracker:udp://tracker.internetwarriors.net:1337',
+							'tracker:udp://tracker.opentrackr.org:1337/announce'
+						]
+					}
+				})
+
+			resolve({
+				streams,
+				cacheMaxAge: cache.maxAge,
+				staleError: cache.staleError
+			})
+		})
+	})
+}
+
+const builder = new addonBuilder(manifest)
+
+builder.defineCatalogHandler(args => {
+	const start = (args.extra || {}).skip ? Math.round(args.extra.skip / 50) + 1 : 1
+	const cat = (args.extra || {}).genre ? args.extra.genre : false
+	return getMovies(start, cat)
+})
+
+builder.defineStreamHandler(args => {
+	return getStreams(args.id)
+})
 
 module.exports = builder.getInterface()
