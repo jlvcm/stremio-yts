@@ -1,6 +1,6 @@
 {
 	"name": "stremio-addon-yts",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "show YTS list",
 	"scripts": {
 		"start": "node server.js"
