@@ -3,7 +3,7 @@ const request = require('request')
 const utils = require('./utils')
 const package = require('./package.json')
 
-const endpoint = 'https://yts.ae' // works with yts.lt too
+const endpoint = 'https://yts.lt'
 
 const oneDay = 24 * 60 * 60 // in seconds
 
@@ -60,8 +60,8 @@ function getMovies(page, cat = false) {
 				return {
 					id: item.imdb_code,
 					name: item.title,
-					poster: endpoint + item.large_cover_image,
-					background: endpoint + item.background_image_original,
+					poster: item.large_cover_image,
+					background: item.background_image_original,
 					year: item.year,
 					releaseInfo: item.year,
 					language: item.language,
