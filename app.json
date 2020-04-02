@@ -1,0 +1,7 @@
+{
+  "name": "Stremio addon for YTS",
+  "description": "Movies and torrent results from YTS",
+  "repository": "https://github.com/jlvcm/stremio-yts",
+  "logo": "https://i2.wp.com/fosslovers.com/wp-content/uploads/2019/01/YTS-logo.png",
+  "keywords": ["node", "stremio", "YTS"]
+}
