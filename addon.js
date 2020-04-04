@@ -1,16 +1,20 @@
 const { addonBuilder } = require('stremio-addon-sdk')
 const request = require('request')
+const NodeCache = require( "node-cache" );
+
 const utils = require('./utils')
 const package = require('./package.json')
 
 const endpoint = 'https://yts.lt'
-
+const myCache = new NodeCache();
 const oneDay = 24 * 60 * 60 // in seconds
 
 const cache = {
 	maxAge: 1.5 * oneDay, // 1.5 days
 	staleError: 6 * 30 * oneDay // 6 months
 }
+
+
 
 const manifest = {
 	id: 'community.yts',
@@ -37,6 +41,22 @@ const manifest = {
 	idPrefixes: ['tt']
 }
 
+function cachedRequest(url,callback, reject){
+    let data = myCache.get(url);
+    if(data){
+        callback(data);
+    }else{
+        request(url,function(error,response,data){
+            if (error || !data || response.statusCode != 200) {
+                    reject('Invalid response from API for category: ' + (cat || 'top') + ' / page: ' + page)
+                    return
+                }
+            myCache.set(url,data,432000);
+            callback(data);
+        });
+    }
+}
+
 function getMovies(page, cat = false) {
 	return new Promise((resolve, reject) => {
 
@@ -47,12 +67,7 @@ function getMovies(page, cat = false) {
 			page
 		}
 
-		request(endpoint + '/api/v2/list_movies.json?' + utils.serialize(query), (error, response, data) => {	
-
-			if (error || !data || response.statusCode != 200) {
-				reject('Invalid response from API for category: ' + (cat || 'top') + ' / page: ' + page)
-				return
-			}
+		cachedRequest(endpoint + '/api/v2/list_movies.json?' + utils.serialize(query), (data) => {	
 
 			const jsonObject = JSON.parse(data)['data']['movies']
 
@@ -86,12 +101,8 @@ function getStreams(imdb) {
 
 		const query = { query_term: imdb }
 
-		request(endpoint + '/api/v2/list_movies.json/?' + utils.serialize(query), (error, response, data) => {	
+		cachedRequest(endpoint + '/api/v2/list_movies.json/?' + utils.serialize(query), (data) => {	
 
-			if (error || !data || response.statusCode != 200) {
-				reject('Invalid responde from API for: ' + imdb)
-				return
-			}
 
 			const jsonObject = JSON.parse(data)['data']['movies']
 
