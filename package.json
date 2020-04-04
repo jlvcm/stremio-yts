@@ -10,6 +10,7 @@
 	},
 	"dependencies": {
 		"request": "^2.88.0",
-		"stremio-addon-sdk": "^1.4.0"
+		"stremio-addon-sdk": "^1.4.0",
+		"node-cache": "5.1.0"
 	}
 }
