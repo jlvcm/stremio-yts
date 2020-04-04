@@ -50,6 +50,9 @@ function getMovies(page, cat = false) {
 		request(endpoint + '/api/v2/list_movies.json?' + utils.serialize(query), (error, response, data) => {	
 
 			if (error || !data || response.statusCode != 200) {
+				console.log({error});
+				if(data) console.log({data});
+				if(respose) console.log({response});
 				reject('Invalid response from API for category: ' + (cat || 'top') + ' / page: ' + page)
 				return
 			}
