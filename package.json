@@ -9,8 +9,8 @@
 		"start": "node server.js"
 	},
 	"dependencies": {
-		"request": "^2.88.0",
-		"stremio-addon-sdk": "^1.4.0",
-		"node-cache": "5.1.0"
+		"node-cache": "5.1.0",
+		"request": "^2.88.2",
+		"stremio-addon-sdk": "^1.6.2"
 	}
 }
