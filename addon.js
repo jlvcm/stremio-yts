@@ -1,12 +1,12 @@
 const { addonBuilder } = require('stremio-addon-sdk')
 const request = require('request')
-const NodeCache = require( "node-cache" );
+const myCache = require('./cache')
 
 const utils = require('./utils')
 const package = require('./package.json')
 
 const endpoint = 'https://yts.lt'
-const myCache = new NodeCache();
+
 const oneDay = 24 * 60 * 60 // in seconds
 
 const cache = {
